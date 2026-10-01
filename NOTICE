@@ -1,0 +1,11 @@
+The files in src/dfbench_smoke/vendor are copied from Learn2Design-2026
+at commit 64781a778ba546f83104c3692c343b16feb7eaf1.
+
+Upstream repository: https://github.com/artificial-scientist-lab/Learn2Design-2026
+Copyright (c) 2026 Artificial Scientist Lab
+
+Those files retain the MIT licence in third_party/learn2design-MIT.txt.
+UPSTREAM.json records their original paths and SHA-256 hashes.
+
+The reference algorithms and scoring helper are not original work of this
+project. Additional code provides the test wrapper and command-line interface.

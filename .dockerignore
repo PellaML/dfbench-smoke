@@ -1,0 +1,15 @@
+.git
+.venv
+.cache
+.run-tmp
+__pycache__
+**/__pycache__
+*.egg-info
+build
+dist
+results
+.env
+.env.*
+*.key
+*.pem
+**/*.egg-info

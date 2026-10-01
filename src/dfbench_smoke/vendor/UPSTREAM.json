@@ -1,0 +1,22 @@
+{
+  "repository": "https://github.com/artificial-scientist-lab/Learn2Design-2026",
+  "commit": "64781a778ba546f83104c3692c343b16feb7eaf1",
+  "files": [
+    {
+      "file": "adam_gd.py",
+      "source_path": "learn2design/example_algorithms/adam_gd.py",
+      "sha256": "14887801207ad07a9f56b43580bda357b12d45ee632e30e5a58fd839673a43e1"
+    },
+    {
+      "file": "random_search.py",
+      "source_path": "learn2design/example_algorithms/random_search.py",
+      "sha256": "c54476dfd3bbdf1b58aa49b5382ffcc25e19bbe5f307d2b5e42567de5324d3ac"
+    },
+    {
+      "file": "validate_submission.py",
+      "source_path": "tools/validate_submission.py",
+      "sha256": "fdc0ae8d4c341b6c493cd1559638246585517f38e171a5c9778fd23f926342e5"
+    }
+  ],
+  "license_file": "third_party/learn2design-MIT.txt"
+}
