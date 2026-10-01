@@ -8,8 +8,9 @@ components. No competition entry or performance advantage is claimed.
 The reference source is pinned to
 [Learn2Design-2026 commit 64781a7](https://github.com/artificial-scientist-lab/Learn2Design-2026/tree/64781a778ba546f83104c3692c343b16feb7eaf1).
 The Python environment uses dfbench 0.3.3 and JAX 0.9.0.1. The intended runtime is
-the Linux test container. Two reference checks have now completed as recorded below.
-Configuration and result-summary unit tests also run on Windows without loading the simulator.
+the Linux test container. Two reference checks and one same-host paired UIFO check
+have completed as recorded below. Configuration and result-summary unit tests also
+run on Windows without loading the simulator.
 
 ## Run
 
@@ -80,8 +81,9 @@ represent a four-hour H100 run. No competitive result is claimed.
 
 The candidate uses a short Adam warm start, then SciPy L-BFGS-B local solves in
 the same unbounded coordinates. Its warm phase uses the public AdamGD reference
-settings: learning rate 0.1, moments 0.9/0.999, epsilon 1e-8 and global-norm
-clipping at 1. It starts at most twelve warm attempts, uses a floor-rounded 15%
+settings, reimplemented in NumPy rather than calling the vendored update:
+learning rate 0.1, moments 0.9/0.999, epsilon 1e-8 and global-norm clipping at 1.
+It starts at most twelve warm attempts, uses a floor-rounded 15%
 evaluation allowance when one is configured, and checks the tightest budget's
 15% progress threshold before each attempt. A single call is not preemptible.
 
@@ -101,8 +103,8 @@ solver or cache storage. Counters describe calls, updates and solve outcomes;
 they can differ from admitted Objective history entries.
 
 This combines established Adam and L-BFGS methods; it is not a claim of a new
-mathematical algorithm. Analytic tests do not establish a UIFO advantage. No
-full-problem performance result for the candidate has been obtained yet.
+mathematical algorithm. In the first paired public UIFO check below, the candidate
+was worse than Adam. Analytic tests do not establish a UIFO advantage.
 
 ## Recorded-time accounting
 
@@ -121,6 +123,58 @@ The earlier stored reference runs below predate this diagnostic and contain no
 per-evaluation timestamps. A candidate comparison therefore needs a fresh
 baseline at the same code revision, not a reconstructed score for those runs.
 
+## First paired UIFO check
+
+The [paired run](https://github.com/PellaML/dfbench-smoke/actions/runs/36917528550)
+completed on 1 October 2026 at code commit
+[02c0904](https://github.com/PellaML/dfbench-smoke/commit/02c0904abfda9bc9291503aeee77fb060455f2c4).
+Adam and the hybrid ran in that order in fresh containers on the same host and
+image. Both used public topology seed 42, optimizer seed 42, 187 parameters,
+a configured 300-second Objective budget, a two-CPU quota and an 8 GiB
+memory/swap limit. All 166 unit and provenance tests passed.
+
+| Method | Evaluations | Feasible observations | Best feasible loss | Objective clock at reporting | Peak process RSS |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Adam reference | 42 | 24 | 4.815239 | 302.38 s | 6.73 GiB |
+| Hybrid candidate | 41 | 22 | 4.909185 | 304.21 s | 6.72 GiB |
+
+Lower loss is better. The candidate was worse by 0.093946 on this case; the green
+workflow means both produced a feasible result, not that the candidate improved
+on the reference. Each container exited 0, was not OOM-killed or timed out, and
+was removed successfully.
+
+For both methods, the canonical and recorded-time-window best losses match.
+The inspected dfbench 0.3.3 implementation admits records only when its sampled
+elapsed time is below the budget. Zero excluded records are therefore expected
+for these fresh runs, not independent confirmation of an exact completion-time
+cutoff. Recorded timestamps may precede output synchronization.
+
+The Objective clock keeps running after the optimizer returns and is sampled
+when the report is built. Its 302.38 and 304.21 second readings include work up
+to that point; they are not exact optimizer durations. This is a separate issue
+from the timing of individual records. Process RSS is not peak container usage
+or a memory bound for longer runs.
+
+The hybrid completed five warm Adam steps and entered one L-BFGS-B solve before
+the budget stopped it. It recorded no restarts, cache hits or numerical failures.
+The run has no per-evaluation trajectory, so those counters do not establish why
+it lost or support a matched-evaluation comparison. Optimizer wall times were
+330.07 and 331.44 seconds; total probe times were 350.64 and 351.82 seconds for
+Adam and the hybrid respectively. These include work outside the logged budget.
+
+The earlier unchanged Adam check below used the same seed and budget but
+admitted 71 evaluations and reached 4.600065, versus 42 and 4.815239 here.
+Throughput cannot be assumed constant across CI jobs; those two historical
+outcomes do not estimate run-to-run variance. The paired order was not reversed,
+and numerical agreement between the two warm-start paths was not traced.
+
+This is one public topology and one seed, without statistical replication. It
+does not establish that the observed gap exceeds run-to-run variation, nor does
+it establish generalization, a private H100 score or prize eligibility.
+Full result and controller records are in
+[docs/paired-uifo-run.json](docs/paired-uifo-run.json). The older runs below are
+historical checks, not additional pairs in this comparison.
+
 ## Verified reference runs
 
 The two checks below completed on 1 October 2026 at code commit
@@ -134,7 +188,7 @@ and the bounded CI container. The UIFO topology seed was also 42.
 | [UIFO](https://github.com/PellaML/dfbench-smoke/actions/runs/36894476101) | 187 | 71 | 40 | 4.600065 | 6.80 GiB |
 
 The configured Objective budgets were 120 and 300 seconds. The observed
-Objective clocks were 120.14 and 303.75 seconds; these are reported as
+Objective clocks at reporting were 120.14 and 303.75 seconds; these are reported as
 observed rather than rounded down to the budgets. Total probe times were
 164.46 and 335.45 seconds. The full machine-readable records and package
 versions are in [docs/reference-runs.json](docs/reference-runs.json).
