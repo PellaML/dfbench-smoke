@@ -31,7 +31,13 @@ class CliTests(unittest.TestCase):
 
     def test_missing_feasible_result_is_not_a_success_when_required(self):
         status, output, errors, _ = self.invoke(
-            ["--require-feasible"], {"feasible_candidate_count": 0, "best_feasible_loss": None}
+            ["--require-feasible"],
+            {
+                "feasible_candidate_count": 0,
+                "best_feasible_loss": None,
+                "time_window_status": "complete",
+                "time_window_feasible_candidate_count": 0,
+            },
         )
         self.assertEqual(status, 3)
         self.assertIn('"best_feasible_loss": null', output)
@@ -78,3 +84,38 @@ class CliTests(unittest.TestCase):
             main([])
         self.assertEqual(raised.exception.code, 2)
         run.assert_not_called()
+
+    def test_late_only_feasibility_does_not_pass_the_gate(self):
+        status, _, errors, _ = self.invoke(
+            ["--require-feasible"],
+            {
+                "feasible_candidate_count": 1,
+                "time_window_status": "complete",
+                "time_window_feasible_candidate_count": 0,
+            },
+        )
+        self.assertEqual(status, 3)
+        self.assertIn("within budget", errors)
+
+    def test_missing_timestamps_do_not_pass_the_gate(self):
+        status, _, errors, _ = self.invoke(
+            ["--require-feasible"],
+            {
+                "feasible_candidate_count": 1,
+                "time_window_status": "unavailable",
+                "time_window_feasible_candidate_count": None,
+            },
+        )
+        self.assertEqual(status, 1)
+        self.assertIn("could not be verified", errors)
+
+    def test_timed_feasible_result_passes_the_gate(self):
+        status, _, _, _ = self.invoke(
+            ["--require-feasible"],
+            {
+                "feasible_candidate_count": 1,
+                "time_window_status": "complete",
+                "time_window_feasible_candidate_count": 1,
+            },
+        )
+        self.assertEqual(status, 0)

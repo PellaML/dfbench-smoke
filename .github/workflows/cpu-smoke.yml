@@ -1,4 +1,4 @@
-name: CPU reference smoke
+name: CPU optimizer check
 run-name: CPU smoke (${{ inputs.problem }}, ${{ inputs.method }})
 
 "on":
@@ -11,11 +11,11 @@ run-name: CPU smoke (${{ inputs.problem }}, ${{ inputs.method }})
         type: choice
         options: [cvoyager, uifo]
       method:
-        description: Unmodified organizer reference method
+        description: Optimizer check or a fixed reference-candidate comparison
         required: true
         default: adam
         type: choice
-        options: [adam, random]
+        options: [adam, random, hybrid, compare]
 
 permissions:
   contents: read
@@ -32,7 +32,6 @@ jobs:
       IMAGE: dfbench-smoke:${{ github.sha }}
       PROBLEM: ${{ inputs.problem }}
       METHOD: ${{ inputs.method }}
-      BUDGET_SECONDS: ${{ inputs.problem == 'uifo' && '300' || '120' }}
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -47,25 +46,10 @@ jobs:
             --cap-drop ALL --security-opt no-new-privileges \
             --tmpfs /tmp:rw,nosuid,nodev,size=256m,mode=1777 \
             --entrypoint python "$IMAGE" -m unittest discover -s tests -v
-      - name: Run one full public-problem smoke
+      - name: Run bounded optimizer checks
         shell: bash
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: "1"
         run: |
-          set -euo pipefail
-          container="$(docker create --init --network none --memory 8g --memory-swap 8g \
-            --cpus 2 --pids-limit 256 --read-only \
-            --cap-drop ALL --security-opt no-new-privileges \
-            --tmpfs /tmp:rw,nosuid,nodev,size=1g,mode=1777 \
-            "$IMAGE" --problem "$PROBLEM" --method "$METHOD" \
-            --seconds "$BUDGET_SECONDS" --seed 42 --require-feasible)"
-          cleanup() {
-            status=$?
-            if ! docker inspect --format '{{json .State}}' "$container"; then
-              [ "$status" -ne 0 ] || status=1
-            fi
-            if ! docker rm --force "$container" >/dev/null; then
-              [ "$status" -ne 0 ] || status=1
-            fi
-            exit "$status"
-          }
-          trap cleanup EXIT
-          timeout --signal=TERM --kill-after=15s 12m docker start --attach "$container"
+          python3 -m dfbench_smoke.ci --image "$IMAGE" --problem "$PROBLEM" --method "$METHOD" --seed 42

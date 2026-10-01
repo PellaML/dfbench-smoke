@@ -1,16 +1,15 @@
 # dfbench-smoke
 
-A small CPU integration check for the public Learn2Design reference optimizers.
-It calls the organizer's optimizer and result-summary functions unchanged,
-then prints a compact JSON record. It is not a competition entry or an
-independent optimization method.
+Bounded CPU checks for Learn2Design reference methods and an experimental hybrid
+optimizer. The `adam` and `random` methods remain unchanged upstream code. The
+`hybrid` method is a separate engineering candidate using standard numerical
+components. No competition entry or performance advantage is claimed.
 
 The reference source is pinned to
 [Learn2Design-2026 commit 64781a7](https://github.com/artificial-scientist-lab/Learn2Design-2026/tree/64781a778ba546f83104c3692c343b16feb7eaf1).
 The Python environment uses dfbench 0.3.3 and JAX 0.9.0.1. The intended runtime is
 the Linux test container. Two reference checks have now completed as recorded below.
-Configuration and result-summary unit
-tests also run on Windows without loading the simulator.
+Configuration and result-summary unit tests also run on Windows without loading the simulator.
 
 ## Run
 
@@ -32,17 +31,20 @@ docker run --rm --init --network none --memory 8g --memory-swap 8g \
 ```
 
 Use `--problem uifo --seconds 300` for a newly generated UIFO topology. Use
-`--method random` for the organizer's uniform-random reference. The seed sets
-the optimizer RNG and, for UIFO only, the public topology generator.
+`--method random` for the organizer's uniform-random reference or `--method hybrid`
+for the candidate. The seed sets the optimizer RNG and, for UIFO only, the public
+topology generator.
 
 The runner uses the dfbench default problem constructors. It does not override
-their bounds, frequency count or feasibility criteria. All result-producing calls remain inside the Objective clock.
-The reference implementation performs its own permitted warmup before logging.
+their bounds, frequency count or feasibility criteria. Initial parameter selection
+and Objective warmup follow the allowed pre-logging setup. Every search-guiding
+Objective evaluation goes through the logged public API.
 
 The default CLI exits successfully when a run completes and a report can be
-written. `--require-feasible` adds a stricter check: exit status 3 means no
-finite, physically feasible result was logged. A failed feasibility check is a scientific outcome, not necessarily a software
-failure. The manual CI workflow keeps this stricter check enabled rather than
+written. `--require-feasible` checks the recorded-time window: exit status 3 means
+no finite, physically feasible result has an Objective timestamp in that window.
+If those timestamps cannot be verified, the command exits 1 instead. A failed
+feasibility check is a scientific outcome, not necessarily a software failure. The manual CI workflow keeps this stricter check enabled rather than
 turning a run with no feasible point green. Dependency or execution errors return
 1, and invalid command-line arguments return 2. A container memory
 failure or timeout can stop the process before it produces any report.
@@ -56,8 +58,10 @@ The final line starts with `DFBENCH_RESULT=` and contains JSON, including:
 - total probe time, optimizer wall time including warmup, and the separate
   Objective clock;
 - logged evaluation count, finite/feasible candidate counts and missing aux data;
-- best feasible loss, or null when there is none;
-- Linux process peak RSS, measured inside the interpreter.
+- canonical best feasible loss, or null when there is none;
+- a separate recorded-time-window summary and any unavailable-data reason;
+- Linux process peak RSS, measured inside the interpreter;
+- candidate work counters when available, not a second score or evaluation count.
 
 The feasibility summary is the organizer's own `summarize_objective` function.
 It handles scalar and batched histories without treating missing feasibility
@@ -71,6 +75,51 @@ Workflow step timings can be used to report the actual image-build duration.
 A passing smoke means only that this public case ran and met the selected
 check. It does not predict the private leaderboard, prove convergence or
 represent a four-hour H100 run. No competitive result is claimed.
+
+## Hybrid candidate
+
+The candidate uses a short Adam warm start, then SciPy L-BFGS-B local solves in
+the same unbounded coordinates. Its warm phase uses the public AdamGD reference
+settings: learning rate 0.1, moments 0.9/0.999, epsilon 1e-8 and global-norm
+clipping at 1. It starts at most twelve warm attempts, uses a floor-rounded 15%
+evaluation allowance when one is configured, and checks the tightest budget's
+15% progress threshold before each attempt. A single call is not preemptible.
+
+Local solves use true, unclipped derivatives, with L-BFGS history 10,
+`maxls=20`, `gtol=1e-6` and `ftol=1e-12`. Normal SciPy convergence safeguards
+remain under the unchanged Objective budget. A solver-limit exit continues
+from an observed point without random perturbation. Converged, abnormal or
+numerically failed solves use two local Gaussian restarts (scales 0.3 and 0.8),
+then a new Objective random sample. The center prefers the best observed
+feasible point, falling back to the best finite point. No private topology,
+score, penalty, physical bound or logging clock is changed.
+
+Exact repeated solver requests can use a solve-local cache. Every actual query
+uses `value_and_grad_aux` and checks the public budget before and after the
+call. Parameter copies retained by the Objective are not reused as mutable
+solver or cache storage. Counters describe calls, updates and solve outcomes;
+they can differ from admitted Objective history entries.
+
+This combines established Adam and L-BFGS methods; it is not a claim of a new
+mathematical algorithm. Analytic tests do not establish a UIFO advantage. No
+full-problem performance result for the candidate has been obtained yet.
+
+## Recorded-time accounting
+
+Schema version 2 keeps the organizer's canonical summary and adds a second
+view using the public `time_steps` and `max_time` properties. It follows the
+closed `[0, T]` interval in the scoring document. Late records are excluded,
+while missing, invalid or nonmonotonic timestamps make that view unavailable.
+The Objective is not modified and no replacement score is written back to it.
+
+These are the Objective's own wall-clock readings. They may be recorded before
+all computation finishes and are not independent completion timestamps. A clock
+step backwards can also make the diagnostic unavailable. Do not interpret the
+window as proof of an exact external wall-time cutoff.
+
+The earlier stored reference runs below predate this diagnostic and contain no
+per-evaluation timestamps. A candidate comparison therefore needs a fresh
+baseline at the same code revision, not a reconstructed score for those runs.
 
 ## Verified reference runs
 
@@ -98,14 +147,19 @@ improvement over the reference method, or a private H100 competition score.
 ## CI limits
 
 The workflow is manual-only. It uses a standard public `ubuntu-24.04` runner,
-a 20-minute job limit, and at most one active run. The scientific process is
+a 20-minute job limit, and at most one active job. Normal modes run one case.
+`compare` runs exactly the reference Adam and the hybrid candidate sequentially
+on that same host, in separate fresh containers with the same public problem,
+seed and budget. It is not an input for arbitrary parameter sweeps. The scientific process is
 inside an 8 GiB, two-CPU container with no network and a read-only root
 filesystem. Temporary compiler/cache files stay in bounded `/tmp` storage.
 OpenBLAS/OpenMP/MKL thread hints are set to one; those hints do not control
 every XLA thread. Docker's CPU quota is a separate limit.
 
-Unit tests use a separate 1 GiB container. The scientific container is removed
-on exit, including failures. No Actions cache, uploaded artifact, image push,
+Unit tests use a separate 1 GiB container. Each scientific case has an eight-minute
+outer wall limit. A disconnected observer waits for the same container rather
+than restarting it. Cleanup is checked for each confirmed container; the
+controller stops before another case if removal is unconfirmed. No Actions cache, uploaded artifact, image push,
 GPU, larger runner or paid API is configured. Results remain in workflow logs.
 
 This workflow tests only this repository's software. It is not a generic
@@ -113,7 +167,7 @@ hosted-compute endpoint or a substitute for the official evaluator.
 
 ## Local unit tests
 
-With NumPy available, these tests do not import JAX or run a simulation:
+With NumPy and SciPy available, these tests do not import JAX or run a simulation:
 
 ```sh
 PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src python -m unittest discover -s tests -v

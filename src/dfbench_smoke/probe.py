@@ -7,23 +7,32 @@ import time
 from importlib.metadata import version
 from typing import Any
 
+from . import __version__
+from .budget_summary import summarize_time_window
 from .config import ProbeConfig
 from .vendor.validate_submission import summarize_objective
 
 SOURCE_COMMIT = "64781a778ba546f83104c3692c343b16feb7eaf1"
 
 
-def run_reference(objective: Any, optimizer: Any, seed: int) -> dict[str, Any]:
-    """Use the reference method unchanged, including its own logging lifecycle."""
+def run_optimizer(objective: Any, optimizer: Any, seed: int) -> dict[str, Any]:
+    """Keep the optimizer in charge of its documented logging lifecycle."""
     started = time.monotonic()
     optimizer.optimize(objective, random_seed=seed)
     wall_seconds = time.monotonic() - started
     summary = summarize_objective(objective)
-    return {
+    report = {
         "optimizer_wall_seconds": wall_seconds,
         "algorithm": str(optimizer.algorithm_str),
         **summary,
+        **summarize_time_window(objective),
     }
+    diagnostics = getattr(optimizer, "diagnostics", None)
+    if diagnostics is not None:
+        if not isinstance(diagnostics, dict):
+            raise ValueError("Optimizer diagnostics must be a dictionary when present.")
+        report["optimizer_diagnostics"] = dict(diagnostics)
+    return report
 
 
 def run_probe(config: ProbeConfig) -> dict[str, Any]:
@@ -47,10 +56,14 @@ def run_probe(config: ProbeConfig) -> dict[str, Any]:
         from .vendor.adam_gd import AdamGD
 
         optimizer = AdamGD()
-    else:
+    elif config.method == "random":
         from .vendor.random_search import RandomSearch
 
         optimizer = RandomSearch()
+    else:
+        from .algorithms.hybrid import HybridLBFGS
+
+        optimizer = HybridLBFGS()
 
     problem = ConstrainedVoyagerProblem() if config.problem == "cvoyager" else UIFOProblem(topology_seed=config.seed)
     objective = Objective(
@@ -63,9 +76,10 @@ def run_probe(config: ProbeConfig) -> dict[str, Any]:
         save_params_history=False,
         save_batched_params_history=False,
     )
-    result = run_reference(objective, optimizer, config.seed)
+    result = run_optimizer(objective, optimizer, config.seed)
     report = {
-        "schema_version": 1,
+        "schema_version": 2,
+        "wrapper_version": __version__,
         "problem": config.problem,
         "method": config.method,
         "optimizer_seed": config.seed,

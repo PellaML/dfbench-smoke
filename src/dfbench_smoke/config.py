@@ -13,8 +13,8 @@ class ProbeConfig:
     def __post_init__(self) -> None:
         if self.problem not in {"cvoyager", "uifo"}:
             raise ValueError("problem must be cvoyager or uifo")
-        if self.method not in {"adam", "random"}:
-            raise ValueError("method must be adam or random")
+        if self.method not in {"adam", "random", "hybrid"}:
+            raise ValueError("method must be adam, random or hybrid")
         if isinstance(self.seconds, bool) or not isinstance(self.seconds, (int, float)):
             raise ValueError("seconds must be a number")
         if not 1 <= self.seconds <= 300:

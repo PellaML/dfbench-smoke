@@ -3,27 +3,32 @@ import unittest
 from types import ModuleType, SimpleNamespace
 from unittest.mock import Mock, patch
 
+import numpy as np
+
 from dfbench_smoke.config import ProbeConfig
-from dfbench_smoke.probe import run_probe, run_reference
+from dfbench_smoke.probe import run_optimizer, run_probe
 
 
 class ProbeTests(unittest.TestCase):
     def test_reference_is_called_once_with_only_the_documented_seed(self):
         objective = SimpleNamespace(
-            loss_history=[4.0, 1.0],
+            loss_history=np.array([4.0, 1.0]),
             is_feasible_history=[True, False],
             batched_loss_history=[],
             batched_is_feasible_history=[],
             time_elapsed=1.0,
+            max_time=1.0,
+            time_steps=[0.5, 1.0],
             eval_count=2,
             budget_exceeded=True,
         )
-        optimizer = Mock(algorithm_str="reference")
-        result = run_reference(objective, optimizer, 42)
+        optimizer = Mock(algorithm_str="reference", diagnostics=None)
+        result = run_optimizer(objective, optimizer, 42)
         optimizer.optimize.assert_called_once_with(objective, random_seed=42)
         self.assertEqual(result["evaluation_count"], 2)
         self.assertEqual(result["feasible_candidate_count"], 1)
         self.assertEqual(result["best_feasible_loss"], 4.0)
+        self.assertEqual(result["time_window_best_feasible_loss"], 4.0)
         self.assertEqual(result["algorithm"], "reference")
         self.assertGreaterEqual(result["optimizer_wall_seconds"], 0)
 
@@ -31,20 +36,22 @@ class ProbeTests(unittest.TestCase):
         optimizer = Mock()
         optimizer.optimize.side_effect = RuntimeError("simulation failed")
         with self.assertRaisesRegex(RuntimeError, "simulation failed"):
-            run_reference(object(), optimizer, 42)
+            run_optimizer(object(), optimizer, 42)
 
     def test_linux_setup_matches_the_organizer_public_runner(self):
-        for problem_name, method in (("cvoyager", "adam"), ("uifo", "random")):
+        for problem_name, method in (("cvoyager", "adam"), ("uifo", "random"), ("uifo", "hybrid")):
             with self.subTest(problem=problem_name, method=method):
                 objective = SimpleNamespace(
                     n_params=7,
                     loss_history=[1.0],
                     is_feasible_history=[True],
                     time_elapsed=0.1,
+                    max_time=120,
+                    time_steps=[0.1],
                     eval_count=1,
                     budget_exceeded=False,
                 )
-                optimizer = Mock(algorithm_str=method)
+                optimizer = Mock(algorithm_str=method, diagnostics=None)
                 jax = ModuleType("jax")
                 jax.default_backend = lambda: "cpu"
                 jax.config = SimpleNamespace(jax_enable_x64=True)
@@ -60,6 +67,10 @@ class ProbeTests(unittest.TestCase):
                 adam.AdamGD = Mock(return_value=optimizer)
                 random = ModuleType("dfbench_smoke.vendor.random_search")
                 random.RandomSearch = Mock(return_value=optimizer)
+                algorithms = ModuleType("dfbench_smoke.algorithms")
+                algorithms.__path__ = []
+                hybrid = ModuleType("dfbench_smoke.algorithms.hybrid")
+                hybrid.HybridLBFGS = Mock(return_value=optimizer)
                 modules = {
                     "jax": jax,
                     "dfbench": framework,
@@ -67,6 +78,8 @@ class ProbeTests(unittest.TestCase):
                     "resource": resource,
                     "dfbench_smoke.vendor.adam_gd": adam,
                     "dfbench_smoke.vendor.random_search": random,
+                    "dfbench_smoke.algorithms": algorithms,
+                    "dfbench_smoke.algorithms.hybrid": hybrid,
                 }
                 with (
                     patch.dict(sys.modules, modules),

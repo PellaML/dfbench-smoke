@@ -14,11 +14,13 @@ from .probe import run_probe
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run a short CPU test on a full public dfbench problem.")
     parser.add_argument("--problem", choices=("cvoyager", "uifo"), required=True)
-    parser.add_argument("--method", choices=("adam", "random"), default="adam")
+    parser.add_argument("--method", choices=("adam", "random", "hybrid"), default="adam")
     parser.add_argument("--seconds", type=float, default=120)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument(
-        "--require-feasible", action="store_true", help="exit 3 unless a finite feasible result was logged"
+        "--require-feasible",
+        action="store_true",
+        help="require a finite feasible result with a Objective timestamp inside its reported budget window",
     )
     return parser
 
@@ -33,11 +35,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         result = run_probe(config)
         payload = json.dumps(result, sort_keys=True, allow_nan=False)
-    except (OSError, RuntimeError, ValueError, ImportError) as error:
+    except (OSError, RuntimeError, ValueError, TypeError, KeyError, ImportError) as error:
         print(f"dfbench-smoke: {error}", file=sys.stderr)
         return 1
     print(f"DFBENCH_RESULT={payload}", flush=True)
-    if args.require_feasible and not result["feasible_candidate_count"]:
-        print("dfbench-smoke: no finite physically feasible result was recorded", file=sys.stderr)
-        return 3
+    if args.require_feasible:
+        if result.get("time_window_status") != "complete":
+            print("dfbench-smoke: timed feasibility could not be verified", file=sys.stderr)
+            return 1
+        if not result["time_window_feasible_candidate_count"]:
+            print("dfbench-smoke: no finite physically feasible result was recorded within budget", file=sys.stderr)
+            return 3
     return 0
