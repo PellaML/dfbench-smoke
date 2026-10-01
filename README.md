@@ -8,7 +8,8 @@ independent optimization method.
 The reference source is pinned to
 [Learn2Design-2026 commit 64781a7](https://github.com/artificial-scientist-lab/Learn2Design-2026/tree/64781a778ba546f83104c3692c343b16feb7eaf1).
 The Python environment uses dfbench 0.3.3 and JAX 0.9.0.1. The intended runtime is
-the Linux test container; it has not yet completed a real scientific run here. Configuration and result-summary unit
+the Linux test container. Two reference checks have now completed as recorded below.
+Configuration and result-summary unit
 tests also run on Windows without loading the simulator.
 
 ## Run
@@ -70,6 +71,29 @@ Workflow step timings can be used to report the actual image-build duration.
 A passing smoke means only that this public case ran and met the selected
 check. It does not predict the private leaderboard, prove convergence or
 represent a four-hour H100 run. No competitive result is claimed.
+
+## Verified reference runs
+
+The two checks below completed on 1 October 2026 at code commit
+[471a451](https://github.com/PellaML/dfbench-smoke/commit/471a45114402bffa474607cce102056628b4616a).
+Both used the unchanged organizer Adam method, optimizer seed 42, Linux CPU
+and the bounded CI container. The UIFO topology seed was also 42.
+
+| Public case | Parameters | Evaluations | Feasible candidates | Best feasible loss | Peak process RSS |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| [Constrained Voyager](https://github.com/PellaML/dfbench-smoke/actions/runs/36893019389) | 48 | 638 | 36 | 4.727176 | 1.92 GiB |
+| [UIFO](https://github.com/PellaML/dfbench-smoke/actions/runs/36894476101) | 187 | 71 | 40 | 4.600065 | 6.80 GiB |
+
+The configured Objective budgets were 120 and 300 seconds. The observed
+Objective clocks were 120.14 and 303.75 seconds; these are reported as
+observed rather than rounded down to the budgets. Total probe times were
+164.46 and 335.45 seconds. The full machine-readable records and package
+versions are in [docs/reference-runs.json](docs/reference-runs.json).
+
+These are different problems, not a before/after performance comparison.
+They establish that these two public cases executed and produced feasible
+results. They do not establish generalization across topologies, an
+improvement over the reference method, or a private H100 competition score.
 
 ## CI limits
 

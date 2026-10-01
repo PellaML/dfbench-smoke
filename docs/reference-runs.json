@@ -1,0 +1,88 @@
+{
+  "recorded_at": "2026-10-01T17:13:22.349271+00:00",
+  "scope": "One public CPU smoke per problem; unmodified organizer Adam, not a private score or optimizer improvement",
+  "container_memory_limit_bytes": 8589934592,
+  "container_cpu_quota": 2,
+  "runs": [
+    {
+      "case": "Constrained Voyager",
+      "workflow_url": "https://github.com/PellaML/dfbench-smoke/actions/runs/36893019389",
+      "tested_commit": "471a45114402bffa474607cce102056628b4616a",
+      "result": {
+        "algorithm": "adam_gd",
+        "backend": "cpu",
+        "best_feasible_loss": 4.727176079957596,
+        "budget_exceeded": true,
+        "evaluation_count": 638,
+        "feasible_candidate_count": 36,
+        "finite_candidate_count": 638,
+        "method": "adam",
+        "missing_feasibility_candidate_count": 0,
+        "objective_budget_seconds": 120.0,
+        "objective_time_seconds": 120.14007687568665,
+        "optimizer_seed": 42,
+        "optimizer_wall_seconds": 145.59697880299998,
+        "packages": {
+          "dfbench": "0.3.3",
+          "differometor": "0.0.5",
+          "jax": "0.9.0.1",
+          "jaxlib": "0.9.0.1",
+          "numpy": "2.5.3",
+          "optax": "0.2.8",
+          "scipy": "1.18.1"
+        },
+        "parameter_count": 48,
+        "peak_process_rss_bytes": 2064310272,
+        "probe_wall_seconds": 164.462405482,
+        "problem": "cvoyager",
+        "python": "3.12.14",
+        "schema_version": 1,
+        "scope": "One public CPU problem; not a competition or H100 score",
+        "source_commit": "64781a778ba546f83104c3692c343b16feb7eaf1",
+        "system": "Linux",
+        "topology_seed": null,
+        "x64_enabled": true
+      }
+    },
+    {
+      "case": "UIFO",
+      "workflow_url": "https://github.com/PellaML/dfbench-smoke/actions/runs/36894476101",
+      "tested_commit": "471a45114402bffa474607cce102056628b4616a",
+      "result": {
+        "algorithm": "adam_gd",
+        "backend": "cpu",
+        "best_feasible_loss": 4.600064875968408,
+        "budget_exceeded": true,
+        "evaluation_count": 71,
+        "feasible_candidate_count": 40,
+        "finite_candidate_count": 71,
+        "method": "adam",
+        "missing_feasibility_candidate_count": 0,
+        "objective_budget_seconds": 300.0,
+        "objective_time_seconds": 303.7511291503906,
+        "optimizer_seed": 42,
+        "optimizer_wall_seconds": 320.93381845299996,
+        "packages": {
+          "dfbench": "0.3.3",
+          "differometor": "0.0.5",
+          "jax": "0.9.0.1",
+          "jaxlib": "0.9.0.1",
+          "numpy": "2.5.3",
+          "optax": "0.2.8",
+          "scipy": "1.18.1"
+        },
+        "parameter_count": 187,
+        "peak_process_rss_bytes": 7302623232,
+        "probe_wall_seconds": 335.450556319,
+        "problem": "uifo",
+        "python": "3.12.14",
+        "schema_version": 1,
+        "scope": "One public CPU problem; not a competition or H100 score",
+        "source_commit": "64781a778ba546f83104c3692c343b16feb7eaf1",
+        "system": "Linux",
+        "topology_seed": 42,
+        "x64_enabled": true
+      }
+    }
+  ]
+}
